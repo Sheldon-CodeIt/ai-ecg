@@ -1,5 +1,4 @@
 import os
-import json
 import streamlit as st
 from pdfminer.high_level import extract_text
 import google.generativeai as genai
@@ -199,7 +198,6 @@ if uploaded_files:
 
                 # Format extracted text
                 formatted_output, id, name, age_gender, date = format_output(pdf_name, text)
-                st.write(formatted_output)
 
                 # Generate summary using Gemini
                 summary = generate_summary_from_gemini(formatted_output)
