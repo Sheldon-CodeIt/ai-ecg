@@ -1,10 +1,12 @@
 import os
 import streamlit as st
-from pdfminer.high_level import extract_text
+
 import google.generativeai as genai
 from dotenv import load_dotenv
 from io import BytesIO
 from fpdf import FPDF  # Importing fpdf for PDF generation
+import tempfile
+import fitz  # PyMuPDF
 
 # Load environment variables
 load_dotenv()
@@ -50,6 +52,7 @@ ecg_summary_model = genai.GenerativeModel(model_name='gemini-1.5-flash-latest',
 
 # Helper function to format extracted text into the desired format
 def format_output(pdf_name, extracted_text):
+    print(extracted_text)
     lines = extracted_text.splitlines()
     summary = f"Based on the extracted text from {pdf_name}, here are the key findings:\n\n"
 
@@ -62,43 +65,58 @@ def format_output(pdf_name, extracted_text):
     # Variables to handle multi-line issues
     temp_name = ""
     temp_date = ""
+    temp_age_gender = ""
 
     # Extract name, age, gender, and date
     for i, line in enumerate(lines):
         if "Patient ID" in line:
             temp_id = line.split(":")[-1].strip()  # Initial id split
             # Only add the next line if it contains additional information for the id
-            if i + 1 < len(lines) and lines[i + 2].strip():
-                temp_id += " " + lines[i + 2].strip()  # Add the next line to the id
+            if i + 1 < len(lines) and lines[i + 1].strip():
+                temp_id += " " + lines[i + 1].strip()  # Add the next line to the id
             id = temp_id.strip()  # Set the id
 
         if "Patient Name" in line:
             temp_name = line.split(":")[-1].strip()  # Initial name split
             # Check if the name is split across multiple lines or not
-            if i + 1 < len(lines) and lines[i + 2].strip() and not ":" in lines[i + 1]:
-                temp_name += " " + lines[i + 2].strip()  # Add the next line to the name only if it's a continuation
+            if i + 1 < len(lines) and lines[i + 1].strip() and not ":" in lines[i + 1]:
+                temp_name += " " + lines[i + 1].strip()  # Add the next line to the name only if it's a continuation
             name = temp_name.strip()  # Set the name
 
-        elif "Age / Gender" in line:
-            age_gender = line.split(":")[-1].strip()  # Extracting Age / Gender after the colon
-        elif "Date and Time" in line:
+        if "Age / Gender" in line:
+            temp_age_gender = line.split(":")[-1].strip()  # Initial name split
+            # Check if the name is split across multiple lines or not
+            if i + 1 < len(lines) and lines[i + 1].strip() and not ":" in lines[i + 1]:
+                temp_age_gender += " " + lines[i + 1].strip()  # Add the next line to the name only if it's a continuation
+            age_gender = temp_age_gender.strip()  # Set the name
+        if "Date and Time" in line:
             # For Date and Time, handle it carefully to capture the full date and time
             temp_date = line.split(":", 1)[-1].strip()  # Split only at the first colon
             date = temp_date.strip()  # Set the date
+
+        # Extract Heart Rate
         elif "Heart Rate" in line or "HR" in line:
             summary += f"Heart Rate: {line.split(':')[-1].strip()} bpm\n"
+
+        # Extract PR Interval
         elif "PR Interval" in line:
             summary += f"PR Interval: {line.split(':')[-1].strip()}\n"
+
+        # Extract QT Interval
         elif "QT Interval" in line:
             summary += f"QT Interval: {line.split(':')[-1].strip()}\n"
+
+        # Extract Summary
         elif "Summary" in line:
             summary += f"\nSummary:\n{line.split(':', 1)[-1].strip()}\n"
 
+    # If summary is empty, include the extracted text in the output
     if summary == f"Based on the extracted text from {pdf_name}, here are the key findings:\n\n":
         summary += extracted_text
 
     # Return the summary with extracted details included
     return summary.strip(), id, name, age_gender, date
+
 
 
 
@@ -185,16 +203,26 @@ uploaded_files = st.file_uploader(
 if uploaded_files:
     pdf_text_data = {}
 
-    # Show spinner while processing the files
+# Show spinner while processing the files
     with st.spinner("Processing files and generating summaries..."):
         for uploaded_file in uploaded_files:
             try:
                 pdf_name = uploaded_file.name
                 pdf_content = uploaded_file.read()
 
-                # Extract text
-                with BytesIO(pdf_content) as pdf_file:
-                    text = extract_text(pdf_file)  # Handle BytesIO input for pdfminer
+                # Create a temporary file to write the PDF content
+                with tempfile.NamedTemporaryFile(delete=False) as temp_pdf_file:
+                    temp_pdf_file.write(pdf_content)
+                    temp_pdf_file_path = temp_pdf_file.name  # Save the file path
+
+                # Extract text using PyMuPDF (fitz)
+                doc = fitz.open(temp_pdf_file_path)
+
+                # Extract text from all pages
+                text = ""
+                for page_num in range(doc.page_count):
+                    page = doc.load_page(page_num)
+                    text += page.get_text("text")  # Extract text from the page
 
                 # Format extracted text
                 formatted_output, id, name, age_gender, date = format_output(pdf_name, text)
@@ -218,6 +246,7 @@ if uploaded_files:
 
             except Exception as e:
                 st.error(f"Error processing {uploaded_file.name}: {e}")
+
 
 else:
     st.info("Upload a PDF to extract and summarize ECG data with AI.")
