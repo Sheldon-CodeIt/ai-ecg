@@ -1,8 +1,7 @@
 import os
 import streamlit as st
-import google.generativeai as genai
 from dotenv import load_dotenv
-from io import BytesIO
+import google.generativeai as genai
 from fpdf import FPDF  # Importing fpdf for PDF generation
 import tempfile
 import fitz  # PyMuPDF
@@ -10,8 +9,8 @@ import fitz  # PyMuPDF
 # Load environment variables
 load_dotenv()
 
-# Configure Gemini API with the API key from environment variables
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+os.getenv("GEMINI_API_KEY")
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 # System prompt to guide Gemini in summarizing ECG reports
 ecg_summary_system_prompt = """
