@@ -17,7 +17,7 @@ ecg_summary_system_prompt = """
 You are given ECG report data. Your task is to summarize it in a structured format based on the following template:
 - Key findings such as Heart Rate, QRS Duration, QT Interval, Corrected QT Interval, PR Interval, and P-R-T Angles should be clearly extracted.
 - Each finding should be explained with its range and an interpretation of what it might indicate about the health condition.
-- Finish with a statement in only 1 line saying if it is normal or abnormal. If there is minor variations then also it should be considered as normal. Just keep it simple if normal then say "The ECG report shows normal findings". If it is abnormal then say "The ECG report shows abnormal findings" 
+- Finish with a summary in 3 lines.
 
 Example:
 Based on the ECG report for Michael P Mascarenhas, here are the key findings and what they might indicate:
