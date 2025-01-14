@@ -5,7 +5,7 @@ import google.generativeai as genai
 from fpdf import FPDF  # Importing fpdf for PDF generation
 import tempfile
 import fitz  # PyMuPDF
-
+import shutil
 
 # Load environment variables
 load_dotenv()
@@ -129,6 +129,38 @@ def generate_summary_from_gemini(extracted_text):
     return response.text  # Ensure the model response contains the 'text' key
 
 
+def add_text_to_pdf(input_pdf_path, output_pdf_path, text):
+    # Open the uploaded PDF
+    doc = fitz.open(input_pdf_path)
+    
+    # Define position for the bottom-left corner (adjust as needed)
+    bottom_left_position = fitz.Point(18, doc[-1].rect.height - 60)  # 18mm from the left, 60mm from the bottom
+    
+    # Loop through all pages to add text
+    for page_num in range(doc.page_count):
+        page = doc.load_page(page_num)
+        page.insert_text(bottom_left_position, text, fontsize=10, color=(50/255, 50/255, 50/255))
+
+    # Save the modified PDF
+    doc.save(output_pdf_path)
+
+# Function to merge PDFs
+def merge_pdfs(uploaded_pdf_path, generated_pdf_path, output_pdf_path):
+    result = fitz.open()
+
+    # Add the uploaded PDF
+    with fitz.open(uploaded_pdf_path) as uploaded_pdf:
+        result.insert_pdf(uploaded_pdf)
+
+    # Add the generated summary PDF
+    with fitz.open(generated_pdf_path) as generated_pdf:
+        result.insert_pdf(generated_pdf)
+    
+    # Save the merged document
+    result.save(output_pdf_path)
+    result.close()
+
+
 # Function to call the Gemini model for summary generation
 def generate_pdf(pdf_name, summary, id, name, age_gender, date):
     # Create a PDF document
@@ -153,12 +185,13 @@ def generate_pdf(pdf_name, summary, id, name, age_gender, date):
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(20, 10, txt="Patient ID:", ln=False)  # Title cell (adjust width as needed)
     pdf.set_font("Arial", '', 10)
-    pdf.cell(0, 10, txt=f"{id}", ln=True)  # Value cell (takes remaining space on the line)
+    pdf.cell(0, 10, txt=f"{id}", ln=True)  # Value cell
 
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(25, 10, txt="Patient Name:", ln=False)
     pdf.set_font("Arial", '', 10)
     pdf.cell(0, 10, txt=f"{name}", ln=True)
+
 
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(25, 10, txt="Age / Gender:", ln=False)
@@ -181,7 +214,7 @@ def generate_pdf(pdf_name, summary, id, name, age_gender, date):
     pdf.set_font("Arial", size=10)
 
     # Add the summary content
-    pdf.multi_cell(0, 10, txt=summary)
+    pdf.multi_cell(0, 5, txt=summary)
 
     # Save the PDF to a file
     pdf_output_path = os.path.join("output", f"{pdf_name}_summary.pdf")
@@ -192,8 +225,6 @@ def generate_pdf(pdf_name, summary, id, name, age_gender, date):
 
 
 # Streamlit App
-
-st.markdown(""" <style> #MainMenu {visibility: hidden;} footer {visibility: hidden;} </style> """, unsafe_allow_html=True)
 
 st.title("AI ECG Report Summary")
 st.write("Upload your ECG PDFs for AI-driven extraction and summarization")
@@ -237,11 +268,19 @@ if uploaded_files:
                 # Generate and save the PDF containing the summary
                 pdf_file_path = generate_pdf(pdf_name, summary, id, name, age_gender, date)
 
+                # Add text to the bottom-left of the uploaded PDF
+                modified_pdf_path = os.path.join("output", f"{pdf_name}_modified.pdf")
+                add_text_to_pdf(temp_pdf_file_path, modified_pdf_path, "Footer Text: ECG Report Summary")
+
+                # Merge the uploaded PDF with the new generated PDF
+                output_pdf_path = os.path.join("output", f"{pdf_name}_merged.pdf")
+                merge_pdfs(modified_pdf_path, pdf_file_path, output_pdf_path)
+
                 st.subheader(f"Generated Summary and Recommendation for {pdf_name}")
                 st.text(summary)
                 st.download_button(
                     label=f"Download {pdf_name} Summary as PDF",
-                    data=open(pdf_file_path, "rb").read(),
+                    data=open(output_pdf_path, "rb").read(),
                     file_name=f"{pdf_name}_summary.pdf",
                     mime="application/pdf"
                 )
