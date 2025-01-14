@@ -126,9 +126,6 @@ def generate_summary_from_gemini(extracted_text):
     response = ecg_summary_model.generate_content(prompt)
     return response.text  # Ensure the model response contains the 'text' key
 
-
-import fitz  # PyMuPDF
-
 def add_text_to_pdf(input_pdf_path, output_pdf_path, text_array, left_margin=18, bottom_margin=80, fontsize=8):
     # Open the uploaded PDF
     doc = fitz.open(input_pdf_path)
