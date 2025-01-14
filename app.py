@@ -4,8 +4,6 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 from fpdf import FPDF  # Importing fpdf for PDF generation
 import tempfile
-import fitz  # PyMuPDF
-import shutil
 
 # Load environment variables
 load_dotenv()
@@ -108,7 +106,7 @@ def format_output(pdf_name, extracted_text):
         # Extract Summary
         elif "Summary" in line:
             summary += f"\nSummary:\n{line.split(':', 1)[-1].strip()}\n"
-    
+
     # If summary is empty, include the extracted text in the output
     if summary == f"Based on the extracted text from {pdf_name}, here are the key findings:\n\n":
         summary += extracted_text
