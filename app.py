@@ -167,9 +167,13 @@ def merge_pdfs(uploaded_pdf_path, generated_pdf_path, output_pdf_path):
     result.close()
 
 
-# Function to call the Gemini model for summary generation
 def generate_pdf(pdf_name, summary, id, name, age_gender, date):
-    # Create a PDF document
+    
+    output_dir = "output"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+
     pdf = FPDF()
     pdf.add_page()
 
@@ -222,8 +226,7 @@ def generate_pdf(pdf_name, summary, id, name, age_gender, date):
     # Add the summary content
     pdf.multi_cell(0, 5, txt=summary)
 
-    # Save the PDF to a file
-    pdf_output_path = os.path.join("output", f"{pdf_name}_summary.pdf")
+    pdf_output_path = os.path.join(output_dir, f"{pdf_name}_summary.pdf")
     pdf.output(pdf_output_path)
     return pdf_output_path
 
