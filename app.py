@@ -18,7 +18,7 @@ ecg_summary_system_prompt = """
 You are given ECG report data. Your task is to summarize it in a structured format based on the following template:
 - Key findings such as Heart Rate, QRS Duration, QT Interval, Corrected QT Interval, PR Interval, and P-R-T Angles should be clearly extracted.
 - Each finding should be explained with its range and an interpretation of what it might indicate about the health condition.
-- Finish with an overall summary of the findings.
+- Finish with an overall summary of the findings in 3 lines.
 
 Example:
 Based on the ECG report for Michael P Mascarenhas, here are the key findings and what they might indicate:
@@ -108,7 +108,7 @@ def format_output(pdf_name, extracted_text):
         # Extract Summary
         elif "Summary" in line:
             summary += f"\nSummary:\n{line.split(':', 1)[-1].strip()}\n"
-
+    
     # If summary is empty, include the extracted text in the output
     if summary == f"Based on the extracted text from {pdf_name}, here are the key findings:\n\n":
         summary += extracted_text
@@ -129,20 +129,30 @@ def generate_summary_from_gemini(extracted_text):
     return response.text  # Ensure the model response contains the 'text' key
 
 
-def add_text_to_pdf(input_pdf_path, output_pdf_path, text):
+import fitz  # PyMuPDF
+
+def add_text_to_pdf(input_pdf_path, output_pdf_path, text_array, left_margin=18, bottom_margin=80, fontsize=8):
     # Open the uploaded PDF
     doc = fitz.open(input_pdf_path)
-    
-    # Define position for the bottom-left corner (adjust as needed)
-    bottom_left_position = fitz.Point(18, doc[-1].rect.height - 60)  # 18mm from the left, 60mm from the bottom
     
     # Loop through all pages to add text
     for page_num in range(doc.page_count):
         page = doc.load_page(page_num)
-        page.insert_text(bottom_left_position, text, fontsize=10, color=(50/255, 50/255, 50/255))
-
+        
+        # Define starting position for text (adjusted by margins)
+        bottom_left_position = fitz.Point(left_margin, page.rect.height - bottom_margin)
+        
+        # Insert each line of text in the array
+        for line in text_array:
+            # Insert the line of text at the current position
+            page.insert_text(bottom_left_position, line, fontsize=fontsize, color=(50/255, 50/255, 50/255))
+            
+            # Move the position down by the font size for the next line
+            bottom_left_position.y += fontsize + 2  # Adjust spacing between lines (2 is the line spacing adjustment)
+    
     # Save the modified PDF
     doc.save(output_pdf_path)
+
 
 # Function to merge PDFs
 def merge_pdfs(uploaded_pdf_path, generated_pdf_path, output_pdf_path):
@@ -222,6 +232,30 @@ def generate_pdf(pdf_name, summary, id, name, age_gender, date):
     return pdf_output_path
 
 
+# Extract summary from the text and split it into an array of lines
+def extract_summary(text, max_line_length=100):
+    # Split the text at 'Summary:' and take the content after it
+    summary_start = text.split("Summary:")[-1].strip()
+    
+    # Split the summary into lines based on max_line_length
+    lines = []
+    while len(summary_start) > max_line_length:
+        # Find the last space before the max_line_length to avoid cutting words
+        break_point = summary_start.rfind(' ', 0, max_line_length)
+        
+        # If no space is found, just cut at max_line_length
+        if break_point == -1:
+            break_point = max_line_length
+        
+        # Append the line to the list and update summary_start
+        lines.append(summary_start[:break_point])
+        summary_start = summary_start[break_point:].strip()
+    
+    # Append any remaining part of the summary
+    if summary_start:
+        lines.append(summary_start)
+    
+    return lines
 
 
 # Streamlit App
@@ -263,6 +297,9 @@ if uploaded_files:
                 # Generate summary using Gemini
                 summary = generate_summary_from_gemini(formatted_output)
 
+                # Extract the actual summary (content after "Summary:")
+                summary_text = extract_summary(summary)
+
                 pdf_text_data[pdf_name] = {"formatted_output": formatted_output, "summary": summary}
 
                 # Generate and save the PDF containing the summary
@@ -270,7 +307,7 @@ if uploaded_files:
 
                 # Add text to the bottom-left of the uploaded PDF
                 modified_pdf_path = os.path.join("output", f"{pdf_name}_modified.pdf")
-                add_text_to_pdf(temp_pdf_file_path, modified_pdf_path, "Footer Text: ECG Report Summary")
+                add_text_to_pdf(temp_pdf_file_path, modified_pdf_path, summary_text)
 
                 # Merge the uploaded PDF with the new generated PDF
                 output_pdf_path = os.path.join("output", f"{pdf_name}_merged.pdf")
