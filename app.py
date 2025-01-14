@@ -6,6 +6,7 @@ from fpdf import FPDF  # Importing fpdf for PDF generation
 import tempfile
 import fitz  # PyMuPDF
 
+
 # Load environment variables
 load_dotenv()
 
@@ -191,6 +192,9 @@ def generate_pdf(pdf_name, summary, id, name, age_gender, date):
 
 
 # Streamlit App
+
+st.markdown(""" <style> #MainMenu {visibility: hidden;} footer {visibility: hidden;} </style> """, unsafe_allow_html=True)
+
 st.title("AI ECG Report Summary")
 st.write("Upload your ECG PDFs for AI-driven extraction and summarization")
 
