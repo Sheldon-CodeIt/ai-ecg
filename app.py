@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 from fpdf import FPDF  # Importing fpdf for PDF generation
 import tempfile
-import fitz
+import pymupdf as fitz
 
 # Load environment variables
 load_dotenv()
